@@ -123,6 +123,10 @@ const PORT = process.env.PORT || 8080;
 
 app.listen(PORT, () => {
   console.log(`Servidor listo en puerto ${PORT}`);
+
+app.post("/", (req, res) => {
+  res.redirect(307, "/whatsapp");
+  
 });
 
 
