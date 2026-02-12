@@ -86,7 +86,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 app.get("/", (req, res) => {
-  res.send("Servidor activo con Gemini 🚀");
+  res.send("Servidor activo con Gemini");
 });
 
 app.post("/whatsapp", async (req, res) => {
@@ -116,7 +116,7 @@ app.post("/whatsapp", async (req, res) => {
   } catch (error) {
     console.error("Error:", error);
 
-    twiml.message("Ocurrió un error 😢 Revisa los logs en Railway.");
+    twiml.message("Ocurrió un error  Revisa los logs en Railway.");
 
     res.type("text/xml");
     res.send(twiml.toString());
