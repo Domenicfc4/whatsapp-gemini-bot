@@ -12,6 +12,12 @@ app.use(bodyParser.urlencoded({ extended: false }));
 // Twilio TwiML helper
 const MessagingResponse = twilio.twiml.MessagingResponse;
 
+// 🔥 NUEVO: Cliente Twilio (para enviar mensajes extra)
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
+
 // Cliente Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -22,30 +28,75 @@ app.get("/", (req, res) => {
   res.send("Servidor activo con Gemini");
 });
 
+// 🔥 NUEVO: función para dividir texto en partes de máximo 1500
+function splitMessage(text, maxLen = 1500) {
+  const chunks = [];
+  let current = "";
+
+  const lines = text.split("\n");
+
+  for (const line of lines) {
+    // Si una sola línea es demasiado larga, la partimos en pedazos
+    if (line.length > maxLen) {
+      if (current.trim()) {
+        chunks.push(current.trim());
+        current = "";
+      }
+
+      for (let i = 0; i < line.length; i += maxLen) {
+        chunks.push(line.slice(i, i + maxLen));
+      }
+      continue;
+    }
+
+    // Si agregar esta línea se pasa del límite
+    const candidate = current ? current + "\n" + line : line;
+
+    if (candidate.length > maxLen) {
+      chunks.push(current.trim());
+      current = line;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current.trim()) chunks.push(current.trim());
+
+  return chunks;
+}
+
 app.post("/whatsapp", async (req, res) => {
   const twiml = new MessagingResponse();
 
   try {
     const incomingText = req.body.Body || "";
+    const from = req.body.From; // whatsapp:+51999999999
+    const to = req.body.To;     // whatsapp:+14155238886 (Twilio sandbox)
+
     console.log("Mensaje recibido:", incomingText);
 
     const result = await model.generateContent(incomingText);
-    let reply = result.response.text();
+    const reply = result.response.text();
 
     console.log("Respuesta Gemini:", reply);
 
-    // Limitar para evitar el error 21617 (1600 caracteres)
-    const MAX = 1500;
-    if (reply.length > MAX) {
-      reply = reply.slice(0, MAX) + "\n\n(Respuesta recortada por límite de WhatsApp)";
-    }
+    // NUEVO: dividir en chunks en vez de recortar
+    const chunks = splitMessage(reply, 1500);
 
-    // IMPORTANTE:
-    // Usando twiml.message(reply) Twilio se encarga del XML bien formado
-    twiml.message(reply);
+    // 1) Primer mensaje se devuelve en TwiML (inmediato)
+    twiml.message(chunks[0] || "…");
 
     res.type("text/xml");
     res.send(twiml.toString());
+
+    // 2) Los demás se envían por la API de Twilio
+    for (let i = 1; i < chunks.length; i++) {
+      await twilioClient.messages.create({
+        from: to,
+        to: from,
+        body: chunks[i],
+      });
+    }
   } catch (error) {
     console.error("Error:", error);
 
