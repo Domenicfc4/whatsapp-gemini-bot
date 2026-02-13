@@ -112,3 +112,9 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`Servidor listo en puerto ${PORT}`);
 });
+
+if (error?.status === 429) {
+  twiml.message("Estoy sin cuota en Gemini 😢 Intenta en 1 minuto o más tarde.");
+  res.type("text/xml");
+  return res.send(twiml.toString());
+}
